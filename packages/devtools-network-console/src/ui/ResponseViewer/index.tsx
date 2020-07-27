@@ -88,7 +88,7 @@ export function ResponseViewer(props: IResponseViewerProps) {
     let languageChoice = 'text';
     let contentType = '';
     if (props.response.status === 'COMPLETE' && props.response.response) {
-        const contentTypeHeader = props.response.response.headers.find(h => h.key === 'content-type');
+        const contentTypeHeader = props.response.response.headers.find(h => h.key.toLowerCase() === 'content-type');
         if (contentTypeHeader) {
             contentType = contentTypeHeader.value;
 

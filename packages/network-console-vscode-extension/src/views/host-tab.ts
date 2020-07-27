@@ -2,11 +2,12 @@
 // Licensed under the MIT License
 
 import * as vscode from 'vscode';
-import { FrontendMessage, IExecuteRequestMessage, ISaveRequestMessage, ISaveCollectionAuthorizationMessage, ISaveEnvironmentVariablesMessage, IOpenWebLinkMessage, IUpdateDirtyFlagMessage, ILogMessage } from 'network-console-shared';
+import { FrontendMessage, IExecuteRequestMessage, ISaveRequestMessage, ISaveCollectionAuthorizationMessage, ISaveEnvironmentVariablesMessage, IOpenWebLinkMessage, IUpdateDirtyFlagMessage, ILogMessage, IRequestCompleteMessage } from 'network-console-shared';
 
 import * as path from 'path';
 import ConfigurationManager from '../config-manager';
 import { IOpenUnattachedRequestMessage } from 'network-console-shared/hosting/frontend-messages';
+import issueRequest from '../net/request-executor';
 
 /**
  * Represents a single tab hosting Network Console. 
@@ -133,8 +134,25 @@ export default class HostTab implements vscode.Disposable {
         });
     }
 
-    protected onExecuteRequest(message: IExecuteRequestMessage) {
-
+    protected async onExecuteRequest(message: IExecuteRequestMessage) {
+        const { configuration, authorization, id } = message;
+        try {
+            const result = await issueRequest(configuration, authorization);
+            
+            const toRespond: IRequestCompleteMessage = {
+                id,
+                type: 'REQUEST_COMPLETE',
+                result,
+            };
+            this.panel.webview.postMessage(toRespond);
+        }
+        catch (e) {
+            this.panel.webview.postMessage({
+                id,
+                type: 'REQUEST_COMPLETE',
+                error: e.message,
+            });
+        }
     }
 
     protected onSaveRequest(message: ISaveRequestMessage) {
