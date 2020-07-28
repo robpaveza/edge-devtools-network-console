@@ -2,9 +2,14 @@
 	"name": "network-console-vscode-extension",
 	"displayName": "network-console-vscode-extension",
 	"description": "Embeds the Network Console DevTools component into VS Code",
+	"author": {
+		"name": "Rob Paveza",
+		"email": "rob@robpaveza.net"
+	},
+	"publisher": "robpaveza",
 	"version": "0.0.1",
 	"engines": {
-		"vscode": "^1.46.1"
+		"vscode": "^1.47.0"
 	},
 	"categories": [
 		"Other"
