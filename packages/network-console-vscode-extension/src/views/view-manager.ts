@@ -39,6 +39,7 @@ export default class ViewManager {
             retainContextWhenHidden: true,
         });
         const result = new HostTab(panel, context, /* singleRequestMode: */ true);
+        result.initNewEmptyRequest();
         this.multitabTabs.add(result);
         return result;
     }

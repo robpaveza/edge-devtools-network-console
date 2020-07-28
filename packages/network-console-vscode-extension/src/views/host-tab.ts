@@ -2,7 +2,7 @@
 // Licensed under the MIT License
 
 import * as vscode from 'vscode';
-import { FrontendMessage, IExecuteRequestMessage, ISaveRequestMessage, ISaveCollectionAuthorizationMessage, ISaveEnvironmentVariablesMessage, IOpenWebLinkMessage, IUpdateDirtyFlagMessage, ILogMessage, IRequestCompleteMessage } from 'network-console-shared';
+import { FrontendMessage, IExecuteRequestMessage, ISaveRequestMessage, ISaveCollectionAuthorizationMessage, ISaveEnvironmentVariablesMessage, IOpenWebLinkMessage, IUpdateDirtyFlagMessage, ILogMessage, IRequestCompleteMessage, HostMessage, INetConsoleRequest } from 'network-console-shared';
 
 import * as path from 'path';
 import ConfigurationManager from '../config-manager';
@@ -14,6 +14,8 @@ import issueRequest from '../net/request-executor';
  */
 export default class HostTab implements vscode.Disposable {
     private disposables: vscode.Disposable[] = [];
+    private messageQueue: HostMessage[] = [];
+    private _singleRequestModeRequestId: string | undefined;
 
     constructor(
         private readonly panel: vscode.WebviewPanel,
@@ -28,8 +30,20 @@ export default class HostTab implements vscode.Disposable {
         this.disposables.push(panel.webview.onDidReceiveMessage(message => {
             this.onMessageFromWebview(message);
         }));
+        this.disposables.push(vscode.window.onDidChangeActiveColorTheme(theme => {
+            const isDark = theme.kind === vscode.ColorThemeKind.Dark;
+            const isHighContrast = theme.kind === vscode.ColorThemeKind.HighContrast;
+
+            this.sendMessage({
+                type: 'CSS_STYLE_UPDATED',
+                isDark,
+                isHighContrast,
+                cssVariables: '',
+            });
+        }));
     }
 
+    // #region HTML slinging
     private initialize() {
         const { panel, context } = this;
         const onDiskPath = vscode.Uri.file(
@@ -82,6 +96,7 @@ export default class HostTab implements vscode.Disposable {
         </html>`;
         this.panel.webview.html = outputHtml;
     }
+    // #endregion HTML slinging
 
     private onMessageFromWebview(message: FrontendMessage) {
         switch (message.type) {
@@ -121,6 +136,21 @@ export default class HostTab implements vscode.Disposable {
         }
     }
 
+    /**
+     * Sends or queues a message. High-level API implementations should call this method rather
+     * than directly calling into the WebView, because the WebView may not yet have initialized.
+     * @param message The message to send
+     */
+    protected sendMessage(message: HostMessage) {
+        if (this.messageQueue) {
+            this.messageQueue.push(message);
+        }
+        else {
+            this.panel.webview.postMessage(message);
+        }
+    }
+
+    // #region Message handlers from the frontend
     protected onConsoleReady() {
         const cssVariables = '';
         const isDark = vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark;
@@ -132,6 +162,12 @@ export default class HostTab implements vscode.Disposable {
             isDark,
             isHighContrast,
         });
+
+        while (this.messageQueue.length) {
+            const nextMessage = this.messageQueue.shift();
+            this.panel.webview.postMessage(nextMessage);
+        }
+        delete this.messageQueue;
     }
 
     protected async onExecuteRequest(message: IExecuteRequestMessage) {
@@ -176,12 +212,59 @@ export default class HostTab implements vscode.Disposable {
     }
 
     protected onOpenNewUnattachedRequest(message: IOpenUnattachedRequestMessage) {
-
+        if (this.singleRequestMode) {
+            this._singleRequestModeRequestId = message.requestId;
+        }
+        else {
+            // todo
+        }
     }
 
     protected onLog(message: ILogMessage) {
         console.info(message);
     }
+    // #endregion Message handlers from the frontend
+
+    // #region API calls from the Host to the frontend
+    public initNewEmptyRequest() {
+        this.sendMessage({
+            type: 'INIT_NEW_EMPTY_REQUEST',
+        });
+    }
+
+    public loadRequest(request: INetConsoleRequest) {
+
+    }
+
+    /**
+     * Closes a view. Only has an effect if this is NOT the singleton tab.
+     * @param requestId 
+     */
+    public closeView(requestId: string) {
+        if (!this.singleRequestMode) {
+            this.sendMessage({
+                type: 'CLOSE_VIEW',
+                requestId,
+            });
+        }
+    }
+
+    /**
+     * Switches to a particular request by ID. 
+     * @param requestId 
+     */
+    public showOpenRequest(requestId: string) {
+        if (!this.singleRequestMode) {
+            this.sendMessage({
+                type: 'SHOW_OPEN_REQUEST',
+                requestId,
+            });
+        }
+        this.panel.reveal();
+    }
+
+    // #endregion API calls from the Host to the frontend
+
 
     dispose() {
         this.panel.dispose();
