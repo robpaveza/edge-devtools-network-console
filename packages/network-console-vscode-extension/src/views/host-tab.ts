@@ -6,8 +6,9 @@ import { FrontendMessage, IExecuteRequestMessage, ISaveRequestMessage, ISaveColl
 
 import * as path from 'path';
 import ConfigurationManager from '../config-manager';
-import { IOpenUnattachedRequestMessage } from 'network-console-shared/hosting/frontend-messages';
+import { IOpenUnattachedRequestMessage, IDisconnectWebSocketMessage, ISendWebSocketMessage } from 'network-console-shared/hosting/frontend-messages';
 import issueRequest from '../net/request-executor';
+import { RequestWebsocket } from '../net/request-websocket';
 
 /**
  * Represents a single tab hosting Network Console. 
@@ -16,6 +17,7 @@ export default class HostTab implements vscode.Disposable {
     private disposables: vscode.Disposable[] = [];
     private messageQueue: HostMessage[] = [];
     private _singleRequestModeRequestId: string | undefined;
+    private _activeWebsockets = new Map<string, RequestWebsocket>();
 
     constructor(
         private readonly panel: vscode.WebviewPanel,
@@ -124,6 +126,12 @@ export default class HostTab implements vscode.Disposable {
             case 'OPEN_NEW_UNATTACHED_REQUEST':
                 this.onOpenNewUnattachedRequest(message);
                 break;
+            case 'DISCONNECT_WEBSOCKET':
+                this.onDisconnectWebsocket(message);
+                break;
+            case 'WEBSOCKET_SEND_MESSAGE':
+                this.onWebsocketSendMessage(message);
+                break;
             case 'LOG':
                 this.onLog(message);
                 break;
@@ -173,6 +181,32 @@ export default class HostTab implements vscode.Disposable {
     protected async onExecuteRequest(message: IExecuteRequestMessage) {
         const { configuration, authorization, id } = message;
         try {
+            if (configuration.url.startsWith('ws://') || configuration.url.startsWith('wss://')) {
+                const ws = new RequestWebsocket(configuration.url, this._singleRequestModeRequestId!, this);
+                this._activeWebsockets.set(this._singleRequestModeRequestId!, ws);
+                ws.connect();
+                this.sendMessage({
+                    id,
+                    type: 'REQUEST_COMPLETE',
+                    result: {
+                        duration: 0,
+                        response: {
+                            body: { content: '' },
+                            headers: [
+                                { 
+                                    key: 'Upgrade',
+                                    value: 'WebSocket',
+                                },
+                            ],
+                            size: 0,
+                            statusCode: 101,
+                            statusText: 'Upgrade',
+                        },
+                        status: 'COMPLETE',
+                    },
+                });
+                return;
+            }
             const result = await issueRequest(configuration, authorization);
             
             const toRespond: IRequestCompleteMessage = {
@@ -180,10 +214,10 @@ export default class HostTab implements vscode.Disposable {
                 type: 'REQUEST_COMPLETE',
                 result,
             };
-            this.panel.webview.postMessage(toRespond);
+            this.sendMessage(toRespond);
         }
         catch (e) {
-            this.panel.webview.postMessage({
+            this.sendMessage({
                 id,
                 type: 'REQUEST_COMPLETE',
                 error: e.message,
@@ -217,6 +251,20 @@ export default class HostTab implements vscode.Disposable {
         }
         else {
             // todo
+        }
+    }
+
+    protected onDisconnectWebsocket(message: IDisconnectWebSocketMessage) {
+        const ws = this._activeWebsockets.get(message.requestId);
+        if (ws) {
+            ws.disconnect();
+        }
+    }
+
+    protected onWebsocketSendMessage(message: ISendWebSocketMessage) {
+        const ws = this._activeWebsockets.get(message.requestId);
+        if (ws) {
+            ws.send(message.message, message.encoding);
         }
     }
 
@@ -265,6 +313,24 @@ export default class HostTab implements vscode.Disposable {
 
     // #endregion API calls from the Host to the frontend
 
+    // #region WebSocket public APIs
+    public notifyWebsocketDisconnected(requestId: string) {
+        this.sendMessage({
+            type: 'WEBSOCKET_DISCONNECTED',
+            requestId,
+        });
+    }
+
+    public notifyWebsocketPacket(requestId: string, data: string, encoding: 'text' | 'base64', direction: 'send' | 'recv') {
+        this.sendMessage({
+            type: 'WEBSOCKET_PACKET',
+            data,
+            direction,
+            encoding,
+            requestId,
+        });
+    }
+    // #endregion WebSocket public APIs
 
     dispose() {
         this.panel.dispose();
