@@ -24,6 +24,7 @@ import WebSocketView from './WebSocket';
 
 interface IConnectedProps {
     response: INetConsoleResponseInternal;
+    showWSView: boolean;
     theme: THEME_TYPE;
 }
 export interface IOwnProps {
@@ -154,7 +155,8 @@ export function ResponseViewer(props: IResponseViewerProps) {
         setCurrentTab('body');
     }
 
-    if (props.response.isWebsocketUpgrade) {
+    if (props.showWSView) {
+        // TODO: determine if we can default to the WS tab the first time we connect to a WS
         tabsToDisplay.push(WEBSOCKET_ITEM);
     } else if (currentTab === 'websocket') {
         // TODO: determine if necessary
@@ -203,7 +205,7 @@ export function ResponseViewer(props: IResponseViewerProps) {
                     </div>
                 </HideUnless>
                 <HideUnless test={currentTab} match="websocket" {...CommonStyles.SCROLL_CONTAINER_STYLE}>
-                    <WebSocketView requestId={props.requestId} />
+                    <WebSocketView requestId={props.requestId} theme={props.theme}/>
                 </HideUnless>
             </div>
 
@@ -260,10 +262,14 @@ function mapStateToProps(state: IView, ownProps: IOwnProps): IConnectedProps {
         });
         throw new Error('Invariant failed: Response not found for given request ID');
     }
-
+    const wsState = state.websocket.get(ownProps.requestId);
+    // Show the Websocket view if there are message associated with this request, even if disconnected.
+    // This allows users to see previous messages and the disconnect status.
+    const showWSView = wsState ? wsState.messages.size > 0 : false
     return {
         response: response,
         theme: state.theme.theme,
+        showWSView,
     };
 }
 

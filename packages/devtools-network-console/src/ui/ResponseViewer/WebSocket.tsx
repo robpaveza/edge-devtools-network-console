@@ -1,21 +1,22 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { css } from 'glamor';
 import { ControlledEditor as MonacoEditor } from '@monaco-editor/react';
 import CommonStyles from 'ui/common-styles';
 import WebSocketMessage from './WebSocketMessage';
 import { Select, SelectOption, Button, ButtonAppearance } from '@microsoft/fast-components-react-msft';
-// import { editor, KeyCode } from 'monaco-editor';
 import { sendWsMessage, sendWsDisconnect } from 'actions/websocket';
-import { useDispatch, connect } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { IView } from 'store';
 import { IWebSocketConnection } from 'reducers/websocket';
+import { THEME_TYPE } from 'themes/vscode-theme';
 
 const CONTAINER_VIEW = css(CommonStyles.FULL_SIZE_NOT_SCROLLABLE, {
     display: 'grid',
     gridTemplateRows: '8fr 24px 2fr',
+    bottom: '35px',
 });
 const MESSAGES_OVERVIEW_STYLE = css(CommonStyles.SCROLL_CONTAINER_STYLE, {
     display: 'flex',
@@ -29,8 +30,8 @@ const MESSAGES_CONTAINER_STYLE = css({
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'flex-end',
-    height: 'calc(100% - 5px)',
     paddingBottom: '5px',
+    marginRight: '10px',
 });
 const DISCONNECTED_STYLE = css({
     display: 'flex',
@@ -42,20 +43,9 @@ const COMMAND_BAR_STYLE = css({
     flexDirection: 'row',
     justifyContent: 'center',
 });
-// const messages = [
-//     ['send', 4, { type: 'INIT_CONNECTION', client: 'ws1-info' }],
-//     ['recv', 27, { type: 'PROTOCOL_NEGOTIATION', capabilities: ['authentication', 'synchronization', 'push'] }],
-//     ['send', 4952, { type: 'AUTHENTICATE', id: 1, user: 'rob@contoso.com', token: 'adDSAFADSFssda=-1=9331hnhnsdjhjaf.1akjdlfjd' }],
-//     ['recv', 5005, { type: 'AUTHENTICATION_ERROR', id: 1, message: 'TOKEN_EXPIRED' }],
-//     ['send', 4, { type: 'INIT_CONNECTION', client: 'ws1-info' }],
-//     ['recv', 27, { type: 'PROTOCOL_NEGOTIATION', capabilities: ['authentication', 'synchronization', 'push'] }],
-//     ['send', 4952, { type: 'AUTHENTICATE', id: 1, user: 'rob@contoso.com', token: 'adDSAFADSFssda=-1=9331hnhnsdjhjaf.1akjdlfjd' }],
-//     ['recv', 5005, { type: 'AUTHENTICATION_ERROR', id: 1, message: 'TOKEN_EXPIRED' }],
-//     ['send', 4, { type: 'INIT_CONNECTION', client: 'ws1-info' }],
-//     ['recv', 27, { type: 'PROTOCOL_NEGOTIATION', capabilities: ['authentication', 'synchronization', 'push'] }],
-//     ['send', 4952, { type: 'AUTHENTICATE', id: 1, user: 'rob@contoso.com', token: 'adDSAFADSFssda=-1=9331hnhnsdjhjaf.1akjdlfjd' }],
-//     ['recv', 5005, { type: 'AUTHENTICATION_ERROR', id: 1, message: 'TOKEN_EXPIRED' }],
-// ];
+const COMMAND_BAR_BUTTON_STYLE = css({
+    marginLeft: '5px'
+});
 
 const BODY_CONTENT_TYPES = [{
     key: 'text',
@@ -80,12 +70,10 @@ const BODY_CONTENT_TYPES = [{
 
 export interface IOwnProps {
     requestId: string;
+    theme: THEME_TYPE;
 }
 
-interface IConnectedProps {
-    connection?: IWebSocketConnection;
-}
-export type IWebSocketViewProps = IConnectedProps & IOwnProps;
+export type IWebSocketViewProps = IOwnProps;
 
 // The 'monaco-editor' package would be used for type checking, but it's not really
 // necessary, and if we actually import it, what ends up happening is that it blows up
@@ -95,13 +83,16 @@ declare namespace editor {
     type IStandaloneCodeEditor = any;
 }
 
-export function WebSocketView(props: IWebSocketViewProps) {
+export default function WebSocketView(props: IWebSocketViewProps) {
     const [toSend, setToSend] = useState('');
     const [format, setFormat] = useState('text');
+    const [hasScrolledUp, setHasScrolledUp] = useState(false);
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
     const dispatch = useDispatch();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>();
-    const messages = props.connection?.messages;
-    const connected = props.connection?.connected;
+    const connection = useSelector<IView, IWebSocketConnection | undefined>(store => store.websocket.get(props.requestId));
+    const messages = connection?.messages;
+    const connected = connection?.connected;
 
     function handleEditorDidMount(_: any, monacoInstance: editor.IStandaloneCodeEditor) {
         editorRef.current = monacoInstance;
@@ -115,7 +106,19 @@ export function WebSocketView(props: IWebSocketViewProps) {
         });
     }
 
-    if (!messages || !connected) {
+    useEffect(() => {
+        if (hasScrolledUp) {
+            return;
+        }
+        const div = scrollContainerRef.current;
+        if (!div || !div.lastElementChild) {
+            return;
+        }
+
+        div.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, [hasScrolledUp, messages]);
+
+    if (!messages) {
         return (
             <div {...CONTAINER_VIEW}>
                 <h4>No WebSocket found for this request-response pair.</h4>
@@ -126,15 +129,22 @@ export function WebSocketView(props: IWebSocketViewProps) {
     return (
         <div {...CONTAINER_VIEW}>
             <div {...MESSAGES_OVERVIEW_STYLE}>
-                <div {...SCROLL_VERT}>
+                <div {...SCROLL_VERT} ref={scrollContainerRef} onScroll={e => {
+                    const div = scrollContainerRef.current;
+                    if (!div) {
+                        return;
+                    }
+
+                    // Allow for a padding of ~3 pixels to scroll down.
+                    setHasScrolledUp(div.scrollTop + div.offsetHeight < (div.scrollHeight - 3));
+                }}>
                     <div {...MESSAGES_CONTAINER_STYLE}>
-                        {messages.toArray().map((m, i) => {
+                        {messages.map((m, i) => {
                             return (
                                 <WebSocketMessage
-                                    key={i}
-                                    dir={m.direction}
+                                    key={m.entryNumber}
                                     time={m.time}
-                                    message={m.content}
+                                    message={m}
                                     />
                             );
                         })}
@@ -144,38 +154,54 @@ export function WebSocketView(props: IWebSocketViewProps) {
             {connected ?
             (<>
                 <div {...COMMAND_BAR_STYLE}>
-                <Select
-                    placeholder="Content Type"
-                    jssStyleSheet={{
-                        select: {
-                            width: '205px',
-                            zIndex: '500',
-                            position: 'relative',
-                        },
-                    }}
-                    onMenuSelectionChange={items => {
-                        const item = items[0]!;
-                        setFormat(item.id);
-                    }}>
-                    {BODY_CONTENT_TYPES.map(item => {
-                        return (
-                            <SelectOption key={item.key} id={item.key} value={item.text} title={item.text} displayString={item.text} />
-                        );
-                    })}
-                </Select>
-                <Button
-                    appearance={ButtonAppearance.primary}
-                    disabled={!connected}
-                    onClick={e => {
-                        dispatch(sendWsDisconnect(props.requestId));
-                        e.stopPropagation();
-                        e.preventDefault();
-                    }}>Disconnect</Button>
+                    <Select
+                        placeholder="Content Type"
+                        jssStyleSheet={{
+                            select: {
+                                width: '300px',
+                                zIndex: '500',
+                                position: 'relative',
+                            },
+                        }}
+                        menuFlyoutConfig={{
+                            verticalAlwaysInView: true,
+                        }}
+                        onMenuSelectionChange={items => {
+                            const item = items[0]!;
+                            setFormat(item.id);
+                        }}>
+                        {BODY_CONTENT_TYPES.map(item => {
+                            return (
+                                <SelectOption key={item.key} id={item.key} value={item.text} title={item.text} displayString={item.text} />
+                            );
+                        })}
+                    </Select>
+                    <div {...COMMAND_BAR_BUTTON_STYLE}>
+                        <Button
+                            appearance={ButtonAppearance.primary}
+                            disabled={!connected || !editorRef.current || editorRef.current!.getValue() === ''}
+                            onClick={e => {
+                                dispatch(sendWsMessage(props.requestId, editorRef.current!.getValue()));
+                                setToSend('');
+                                e.stopPropagation();
+                                e.preventDefault();
+                            }}>Send</Button>
+                    </div>
+                    <div {...COMMAND_BAR_BUTTON_STYLE}>
+                        <Button
+                            appearance={ButtonAppearance.outline}
+                            disabled={!connected}
+                            onClick={e => {
+                                dispatch(sendWsDisconnect(props.requestId));
+                                e.stopPropagation();
+                                e.preventDefault();
+                            }}>Disconnect</Button>
+                    </div>
                 </div>
                 <div className="ht100 flxcol">
                     <MonacoEditor
                         language={format}
-                        theme="light"
+                        theme={props.theme}
                         value={toSend}
                         onChange={(_e, newValue) => {
                             setToSend(newValue!);
@@ -194,17 +220,7 @@ export function WebSocketView(props: IWebSocketViewProps) {
 function NotConnected() {
     return (
         <div {...DISCONNECTED_STYLE}>
-            Websocket disconnected! Resend the request to re-connect!
+            Websocket disconnected. Resend the request to re-connect.
         </div>
     );
 }
-
-function mapStateToProps(state: IView, ownProps: IOwnProps): IConnectedProps {
-    const wsConnection = state.websocket.get(ownProps.requestId);
-    return {
-        connection: wsConnection
-    };
-}
-
-export const ConnectedWebSocketViewer = connect(mapStateToProps)(WebSocketView);
-export default ConnectedWebSocketViewer;
