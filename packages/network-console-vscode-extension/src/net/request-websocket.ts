@@ -3,12 +3,13 @@
 
 import * as vscode from 'vscode';
 import * as WebSocket from 'ws';
-import { Base64String } from 'network-console-shared';
+import { Base64String, ms } from 'network-console-shared';
 import HostTab from '../views/host-tab';
 
 export class RequestWebsocket implements vscode.Disposable {
     private _ws: WebSocket | null;
     private _disposables: vscode.Disposable[] = [];
+    private _connected: ms = 0;
 
     constructor(private url: string, private requestId: string, private tab: HostTab) {
         this._ws = null;
@@ -17,15 +18,19 @@ export class RequestWebsocket implements vscode.Disposable {
     connect() {
         const { url, requestId, tab } = this;
         this._ws = new WebSocket(url);
+        this._ws.on('open', () => {
+            this._connected = Date.now();
+            tab.notifyWebsocketConnected(requestId);
+        });
         this._ws.on('close', () => {
             tab.notifyWebsocketDisconnected(requestId);
         });
         this._ws.on('message', data => {
             if (typeof data === 'string') {
-                tab.notifyWebsocketPacket(requestId, data, 'text', 'recv');
+                tab.notifyWebsocketPacket(requestId, data, 'text', 'recv', Date.now() - this._connected);
             }
             else {
-                tab.notifyWebsocketPacket(requestId, data.toString('base64'), 'base64', 'recv');
+                tab.notifyWebsocketPacket(requestId, data.toString('base64'), 'base64', 'recv', Date.now() - this._connected);
             }
         });
     }
@@ -42,7 +47,7 @@ export class RequestWebsocket implements vscode.Disposable {
             this._ws.send(message);
         }
 
-        this.tab.notifyWebsocketPacket(this.requestId, message, encoding, 'send');
+        this.tab.notifyWebsocketPacket(this.requestId, message, encoding, 'send', Date.now() - this._connected);
     }
 
     disconnect() {

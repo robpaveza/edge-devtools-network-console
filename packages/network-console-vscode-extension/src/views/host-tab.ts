@@ -2,7 +2,7 @@
 // Licensed under the MIT License
 
 import * as vscode from 'vscode';
-import { FrontendMessage, IExecuteRequestMessage, ISaveRequestMessage, ISaveCollectionAuthorizationMessage, ISaveEnvironmentVariablesMessage, IOpenWebLinkMessage, IUpdateDirtyFlagMessage, ILogMessage, IRequestCompleteMessage, HostMessage, INetConsoleRequest } from 'network-console-shared';
+import { FrontendMessage, IExecuteRequestMessage, ISaveRequestMessage, ISaveCollectionAuthorizationMessage, ISaveEnvironmentVariablesMessage, IOpenWebLinkMessage, IUpdateDirtyFlagMessage, ILogMessage, IRequestCompleteMessage, HostMessage, INetConsoleRequest, ms } from 'network-console-shared';
 
 import * as path from 'path';
 import ConfigurationManager from '../config-manager';
@@ -314,6 +314,13 @@ export default class HostTab implements vscode.Disposable {
     // #endregion API calls from the Host to the frontend
 
     // #region WebSocket public APIs
+    public notifyWebsocketConnected(requestId: string) {
+        this.sendMessage({
+            type: 'WEBSOCKET_CONNECTED',
+            requestId,
+        });
+    }
+    
     public notifyWebsocketDisconnected(requestId: string) {
         this.sendMessage({
             type: 'WEBSOCKET_DISCONNECTED',
@@ -321,13 +328,14 @@ export default class HostTab implements vscode.Disposable {
         });
     }
 
-    public notifyWebsocketPacket(requestId: string, data: string, encoding: 'text' | 'base64', direction: 'send' | 'recv') {
+    public notifyWebsocketPacket(requestId: string, data: string, encoding: 'text' | 'base64', direction: 'send' | 'recv', timeFromConnection: ms) {
         this.sendMessage({
             type: 'WEBSOCKET_PACKET',
             data,
             direction,
             encoding,
             requestId,
+            timeFromConnection,
         });
     }
     // #endregion WebSocket public APIs
