@@ -21,7 +21,10 @@ import { ContainerAdapter } from './container-adapter';
 import { RequestAdapter } from './request-adapter';
 import { convertSecurityToNC } from './authorization-adapter';
 
-export class CollectionAdapter implements ICollectionAdapter {
+export class CollectionAdapter implements ICollectionAdapter, ICollectionContainerAdapter {
+    public readonly type = 'container';
+    public readonly collection = this;
+
     private _keyToIndex: BidiMap<string, number>;
     public readonly isDirty = false;
     private readonly immediateChildren: ICollectionEntryAdapter[];

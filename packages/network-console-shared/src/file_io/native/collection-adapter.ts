@@ -34,7 +34,10 @@ type ValidityCheckResult = {
     error: string;
 };
 
-export class CollectionAdapter implements ICollectionAdapter {
+export class CollectionAdapter implements ICollectionAdapter, ICollectionContainerAdapter {
+    public readonly type = 'container';
+    public readonly collection = this;
+    
     private _dirty: boolean;
     private _current: INCNativeRoot;
     private _keyToIndex: BidiMap<string, number>;

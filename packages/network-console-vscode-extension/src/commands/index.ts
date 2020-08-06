@@ -2,14 +2,16 @@
 // Licensed under the MIT License
 
 import * as vscode from 'vscode';
-import ViewManager from '../views/view-manager';
-import ConfigurationManager from '../config-manager';
 
 import registerCreateNewNetworkConsoleRequestCommand from './create-new-network-console-request';
+import registerRefreshCollectionsCommand from './refresh-collections-command';
+import registerOpenRequestByIdCommand from './open-request-by-id';
 
 type RegisterFn = (c: vscode.ExtensionContext) => void;
 const registrations: RegisterFn[] = [
     registerCreateNewNetworkConsoleRequestCommand,
+    registerRefreshCollectionsCommand,
+    registerOpenRequestByIdCommand,
 ];
 
 export default function registerCommands(

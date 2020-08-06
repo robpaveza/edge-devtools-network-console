@@ -38,7 +38,7 @@ export interface ICollectionFormat {
     tryParse(id: string, contents: string): Promise<ICollectionAdapter | null>;
 }
 
-export interface ICollectionAdapter {
+export interface ICollectionAdapter extends ICollectionContainerAdapter {
     readonly format: ICollectionFormat;
     readonly id: string;
     readonly isDirty: boolean;

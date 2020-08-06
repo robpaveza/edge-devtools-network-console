@@ -10,7 +10,8 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:network-console-vscode-extension.new"
+		"onCommand:network-console-vscode-extension.new",
+		"onView:network-console-vscode-extension.collections"
 	],
 	"main": "./dist/extension.js",
 	"contributes": {
@@ -19,6 +20,15 @@
 				"command": "network-console-vscode-extension.new",
 				"title": "New Request",
 				"category": "Network Console"
+			},
+			{
+				"command": "network-console-vscode-extension.refresh",
+				"title": "Refresh Collections",
+				"category": "Network Console"
+			},
+			{
+				"command": "network-console-vscode-extension.open-request-by-id",
+				"title": "Open request by ID"
 			}
 		],
 		"configuration": {
@@ -40,13 +50,24 @@
 					"markdownDescription": "Use native VS Code tabs instead of a single 'Network Console' tab. **Warning**: This will use additional memory per-tab, since each tab is presented in a unique VS Code WebView."
 				}
 			}
+		},
+		"viewsContainers": {
+
+		},
+		"views": {
+			"explorer": [
+				{
+					"id": "network-console-vscode-extension.collections",
+					"name": "Network Console Collections"
+				}
+			]
 		}
 	},
 	"scripts": {
 		"vscode:prepublish": "node ./node_modules/webpack-cli/bin/cli --mode production",
 		"compile": "node ./node_modules/webpack-cli/bin/cli --mode development",
 		"lint": "eslint src --ext ts",
-		"watch": "node ./node_modules/webpack-cli/bin/cli --mode development --watch",
+		"watch": "node ./node_modules/webpack-cli/bin/cli --mode development --watch --info-verbosity verbose",
 		"pretest": "npm run compile && npm run lint",
 		"test": "node ./out/test/runTest.js"
 	},

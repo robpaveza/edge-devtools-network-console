@@ -117,3 +117,5 @@ export {
     IEnvironment,
     IEnvironmentRoot,
 } from './environments';
+
+export { default as CollectionFormats } from './file_io';

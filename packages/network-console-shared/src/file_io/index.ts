@@ -11,3 +11,11 @@ const formats = {
     'openapi': new OpenAPICollectionFormat(),
 };
 export default formats;
+
+export { 
+    ICollectionAdapter, 
+    ICollectionContainerAdapter, 
+    ICollectionEntryAdapter, 
+    ICollectionFormat, 
+    ICollectionItemAdapter,
+} from './interfaces';

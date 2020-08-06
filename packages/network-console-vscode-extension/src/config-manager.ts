@@ -2,23 +2,17 @@
 // Licensed under the MIT License
 
 import * as vscode from 'vscode';
+import { SINGLETON_ID } from './util/singleton-manager';
 
 export default class ConfigurationManager {
-    private static _instance: ConfigurationManager;
-    public static instance: () => ConfigurationManager = () => {
-        if (!ConfigurationManager._instance) {
-            ConfigurationManager._instance = new ConfigurationManager();
-        }
-        return ConfigurationManager._instance;
-    };
-
+    public static readonly [SINGLETON_ID] = 'ConfigurationManager';
     private _current = {
         ignoreHttpsCertificateErrors: true,
         developerMode: false,
         openFrontendInMultipleTabs: false,
     };
 
-    private constructor() {
+    constructor() {
         vscode.workspace.onDidChangeConfiguration(cce => {
             if (cce.affectsConfiguration('networkConsole')) {
                 this._refreshConfiguration();

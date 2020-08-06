@@ -1,4 +1,4 @@
-// Copyright (c) Rob Paveza
+// Copyright (c) 2020, Rob Paveza
 // Licensed under the MIT License
 
 import * as vscode from 'vscode';
@@ -8,6 +8,9 @@ import * as path from 'path';
 import ConfigurationManager from '../config-manager';
 import { IOpenUnattachedRequestMessage } from 'network-console-shared/hosting/frontend-messages';
 import issueRequest from '../net/request-executor';
+import { serializeRequest } from '../util/copy-serialized-objects';
+import SingletonManager from '../util/singleton-manager';
+import ViewManager from './view-manager';
 
 /**
  * Represents a single tab hosting Network Console. 
@@ -16,6 +19,7 @@ export default class HostTab implements vscode.Disposable {
     private disposables: vscode.Disposable[] = [];
     private messageQueue: HostMessage[] = [];
     private _singleRequestModeRequestId: string | undefined;
+    private title: string;
 
     constructor(
         private readonly panel: vscode.WebviewPanel,
@@ -41,6 +45,7 @@ export default class HostTab implements vscode.Disposable {
                 cssVariables: '',
             });
         }));
+        this.title = 'Network Console';
     }
 
     // #region HTML slinging
@@ -53,7 +58,7 @@ export default class HostTab implements vscode.Disposable {
 
         let hostUri = iframeUri.toString();
         let allowedFrameSrc = panel.webview.cspSource;
-        const config = ConfigurationManager.instance();
+        const config = SingletonManager.get(context).getInstance(ConfigurationManager);
         if (config.developerMode) {
             hostUri = ' http://localhost:3000/';
             allowedFrameSrc += ' http://localhost:3000';
@@ -97,6 +102,10 @@ export default class HostTab implements vscode.Disposable {
         this.panel.webview.html = outputHtml;
     }
     // #endregion HTML slinging
+
+    public reveal() {
+        this.panel.reveal();
+    }
 
     private onMessageFromWebview(message: FrontendMessage) {
         switch (message.type) {
@@ -208,12 +217,18 @@ export default class HostTab implements vscode.Disposable {
     }
 
     protected onUpdateDirtyFlag(message: IUpdateDirtyFlagMessage) {
-
+        const title = message.isDirty ? `${this.title} *` : this.title;
+        this.panel.title = title;
     }
 
     protected onOpenNewUnattachedRequest(message: IOpenUnattachedRequestMessage) {
         if (this.singleRequestMode) {
             this._singleRequestModeRequestId = message.requestId;
+            this.title = '(Untitled Network Request)';
+            this.panel.title = '(Untitled Network Request)';
+            SingletonManager.get(this.context)
+                .getInstance(ViewManager)
+                .linkTabToId(message.requestId, this);
         }
         else {
             // todo
@@ -232,8 +247,20 @@ export default class HostTab implements vscode.Disposable {
         });
     }
 
-    public loadRequest(request: INetConsoleRequest) {
-
+    public loadRequest(requestId: string, request: INetConsoleRequest) {
+        if (this.singleRequestMode) {
+            this._singleRequestModeRequestId = requestId;
+            this.sendMessage({
+                type: 'LOAD_REQUEST',
+                request: serializeRequest(request),
+                requestId,
+            });
+            this.title = request.name;
+            this.panel.title = request.name;
+        }
+        else {
+            // todo
+        }
     }
 
     /**
