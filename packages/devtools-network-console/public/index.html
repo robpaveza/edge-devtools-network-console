@@ -112,9 +112,9 @@ div.described-choices label {
   font-size: 14px !important;
 }
 
-/* Radios appear to hover over dialogs and don't seem to need to be z-indexed. */
-input[type="radio"] {
-  z-index: auto !important;
+/* FAST Radios appear above FAST modals */
+.modalManager_modal_root > div {
+  z-index: 2;
 }
 
     </style>

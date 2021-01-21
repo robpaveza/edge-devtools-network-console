@@ -3,13 +3,13 @@
 
 import * as React from 'react';
 import { connect, useDispatch, useSelector } from 'react-redux';
-import { 
-    DataGrid, 
-    DataGridColumn, 
-    DataGridCellRenderConfig, 
+import {
+    DataGrid,
+    DataGridColumn,
+    DataGridCellRenderConfig,
     LightweightButton,
     Pivot,
-    Progress, 
+    Progress,
 } from '@microsoft/fast-components-react-msft';
 import { DesignSystemProvider } from '@microsoft/fast-jss-manager-react';
 import { DataGridHeaderRenderConfig } from '@microsoft/fast-components-react-base';
@@ -258,7 +258,14 @@ function Pending({ requestId }: { requestId: string; }) {
 
 function ErrorBelowApplication() {
     return (
-        <div {...Styles.NO_REQ_STYLE} style={{display: 'flex', flexFlow: 'column nowrap', alignItems: 'stretch', margin: '20px'}}>
+        <div {...Styles.NO_REQ_STYLE} style={{
+            display: 'flex',
+            flexFlow: 'column nowrap',
+            alignItems: 'stretch',
+            padding: '20px',
+            boxSizing: 'border-box',
+            justifyContent: 'flex-start',
+        }}>
             <h2>
                 <LocText textKey="Response.requestFailedTitleLabel" />
             </h2>

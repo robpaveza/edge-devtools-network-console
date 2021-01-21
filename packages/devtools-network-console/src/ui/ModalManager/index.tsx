@@ -132,7 +132,6 @@ export function ModalManager(props: IConnectedProps) {
     return (
         <Dialog
             modal
-
             className={MODAL_CLASS_NAME}
             visible={isOpen}
             onDismiss={() => {
