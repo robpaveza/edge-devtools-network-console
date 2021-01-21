@@ -40,8 +40,8 @@ export function focusNextGridElement(currentTarget: HTMLButtonElement, fallbackT
 
     const isOnLastRow = rows.length === currentRowIndex + 1;
     if (isOnLastRow) {
-        const fallbackTarget = document.querySelector(fallbackTargetSelector) as HTMLElement;
-        scheduleFocus(fallbackTarget);
+        const fallbackTarget = document.querySelector(fallbackTargetSelector) as HTMLElement | undefined;
+        fallbackTarget?.focus();
     }
     else {
         let targetRowIndex = currentRowIndex;
@@ -61,10 +61,6 @@ export function focusNextGridElement(currentTarget: HTMLButtonElement, fallbackT
         if (!targetInput) {
             throw new Error('Invariant failed: Unexpected DOM structure (missing input,button,select within a div.nc-editor-cell-key)');
         }
-        scheduleFocus(targetInput);
+        targetInput.focus();
     }
-}
-
-function scheduleFocus(target: HTMLElement) {
-    target.focus();
 }
